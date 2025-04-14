@@ -5,7 +5,7 @@
 
 - **Álvaro Coelho Jesus** - RA: 22.221.002-3  
 - **Nicolas Costa Copolla de Moraes** - RA: 22.122.099-9  
-- **Renan Guastella Piva** - RA: 22.221.009-6  
+- **Renan Guastella Piva** - RA: 22.221.029-6  
 
 ---
 
