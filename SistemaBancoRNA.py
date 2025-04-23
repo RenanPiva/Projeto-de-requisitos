@@ -58,6 +58,12 @@ def nCliente():
     if not valInicial.isdigit():
         messagebox.showerror("Erro", "Valor inicial inválido. Digite um número.")
         return
+    elif float(valInicial) < 0:
+        messagebox.showerror("Erro", "Valor inicial não pode ser negativo.")
+        return
+    elif ',' in valInicial:
+        messagebox.showerror("Erro", "Valor inicial não pode conter vírgula.\nUtilizar ponto.")
+        return
     
     if os.path.isfile("cliente.txt"):
         with open("cliente.txt", "r") as arq:
@@ -127,7 +133,19 @@ def transferirC():
     cpf_origem = usuario_cpf
     senha = usuario_senha
     cpf_destino = entry_cpf_destino.get()
-    valor = float(entry_valor_transferencia.get())
+    valorEntrada = entry_valor_transferencia.get()
+    
+    if ',' in valorEntrada:
+        messagebox.showerror("Erro", "Valor inválido. Utilize ponto em vez de vírgula.")
+        return
+    elif not valorEntrada.isdigit():
+        messagebox.showerror("Erro", "Valor inválido. Digite um número.")
+        return
+    elif float(valorEntrada) <= 0:
+        messagebox.showerror("Erro", "Valor inválido. O valor deve ser maior que zero.")
+        return
+    
+    valor = float(valorEntrada)
     observacao = entry_observacao.get()
 
     with open("cliente.txt", "r") as arq:
@@ -253,6 +271,8 @@ def abrir_tela_cadastro():
 
     tk.Label(frame_central, text="CPF:", font=("Arial", 12)).grid(row=1, column=0, pady=5)
     entry_cpf = tk.Entry(frame_central, font=("Arial", 12))
+    entry_cpf.insert(0, "xxx.xxx.xxx-xx")
+    entry_cpf.bind("<FocusIn>", lambda event: entry_cpf.delete(0, tk.END) if entry_cpf.get() == "xxx.xxx.xxx-xx" else None)
     entry_cpf.grid(row=1, column=1, pady=5)
 
     tk.Label(frame_central, text="E-mail:", font=("Arial", 12)).grid(row=2, column=0, pady=5)
@@ -293,6 +313,8 @@ def abrir_tela_login():
 
     tk.Label(frame_central, text="CPF:", font=("Arial", 12)).grid(row=0, column=0, pady=5)
     entry_cpf_login = tk.Entry(frame_central, font=("Arial", 12))
+    entry_cpf_login.insert(0, "xxx.xxx.xxx-xx")
+    entry_cpf_login.bind("<FocusIn>", lambda event: entry_cpf_login.delete(0, tk.END) if entry_cpf_login.get() == "xxx.xxx.xxx-xx" else None)
     entry_cpf_login.grid(row=0, column=1, pady=5)
 
     tk.Label(frame_central, text="Senha:", font=("Arial", 12)).grid(row=1, column=0, pady=5)
@@ -317,10 +339,102 @@ def validar_login():
             usuario_senha = senha
             usuario_nome = linhaS[0]
             usuario_tipo_conta = linhaS[3]
+            tela_inicial.withdraw()  # Oculta a tela inicial
             abrir_tela_principal()
             return
 
     messagebox.showerror("Erro", "CPF ou senha incorretos.")
+
+# Função para abrir a tela de saque
+def abrir_tela_saque():
+    global tela_saque, entry_valor_saque
+    tela_saque = tk.Toplevel(tela_principal)
+    tela_saque.title("Realizar Saque")
+    tela_saque.geometry("400x200")
+
+    largura = 400
+    altura = 200
+    largura_tela = tela_saque.winfo_screenwidth()
+    altura_tela = tela_saque.winfo_screenheight()
+    pos_x = (largura_tela // 2) - (largura // 2)
+    pos_y = (altura_tela // 2) - (altura // 2)
+    tela_saque.geometry(f"{largura}x{altura}+{pos_x}+{pos_y}")
+
+    frame_central = tk.Frame(tela_saque, bg="lightgray")
+    frame_central.pack(expand=True)
+
+    tk.Label(frame_central, text="Valor do Saque:", font=("Arial", 12)).grid(row=0, column=0, pady=5)
+    entry_valor_saque = tk.Entry(frame_central, font=("Arial", 12))
+    entry_valor_saque.grid(row=0, column=1, pady=5)
+
+    tk.Button(frame_central, text="Sacar", command=realizar_saque, font=("Arial", 12), bg="lightblue", fg="black").grid(row=1, column=0, columnspan=2, pady=10)
+
+# Função para realizar o saque
+def realizar_saque():
+    valorEntrada = entry_valor_saque.get()
+    
+    if ',' in str(valorEntrada):
+        messagebox.showerror("Erro", "Valor inválido. Utilize ponto em vez de vírgula.")
+        return
+    
+    try:
+        valor = float(valorEntrada)
+    except ValueError:
+        messagebox.showerror("Erro", "Valor inválido. Digite um número válido.")
+        return
+
+    if valor <= 0:
+        messagebox.showerror("Erro", "Valor inválido. O valor deve ser maior que zero.")
+        return
+    
+    with open("cliente.txt", "r") as arq:
+        checar = arq.readlines()
+
+    cliente_atual = None
+    novo_conteudo = []
+
+    for linha in checar:
+        linhaS = linha.split()
+        if linhaS[1] == usuario_cpf and linhaS[5] == usuario_senha:
+            cliente_atual = linhaS
+            saldo_atual = float(linhaS[4])
+            
+            # Verificar limites baseado no tipo de conta
+            if linhaS[3].lower() == "comum":
+                if (saldo_atual - valor) < -500:
+                    messagebox.showerror("Erro", "Saldo insuficiente. Conta Comum permite limite de - R$500.")
+                    return
+                taxa = valor * 0.03  # 3% de taxa
+            elif linhaS[3].lower() == "plus":
+                if (saldo_atual - valor) < -5000:
+                    messagebox.showerror("Erro", "Saldo insuficiente. Conta Plus permite limite de - R$5000.")
+                    return
+                taxa = valor * 0.01  # 1% de taxa
+            else:  # Conta Salário
+                if (saldo_atual - valor) < 0:
+                    messagebox.showerror("Erro", "Saldo insuficiente. Conta Salário não permite saldo negativo.")
+                    return
+                taxa = valor * 0.05  # 5% de taxa
+
+            novo_saldo = saldo_atual - (valor + taxa)
+            linhaS[4] = str(novo_saldo)
+            linha = " ".join(linhaS) + "\n"
+            
+            # Registrar no extrato
+            with open(f"extrato{linhaS[0]}.txt", "a") as extrato:
+                extrato.write(f"Data: {data_em_texto} Saque: -{valor:.2f} Taxa: {taxa:.2f} Saldo: {novo_saldo:.2f}\n")
+
+        novo_conteudo.append(linha)
+
+    if not cliente_atual:
+        messagebox.showerror("Erro", "Usuário não encontrado.")
+        return
+
+    with open("cliente.txt", "w") as arq:
+        arq.writelines(novo_conteudo)
+
+    messagebox.showinfo("Sucesso", f"Saque de R${valor:.2f} realizado com sucesso!\nTaxa cobrada: R${taxa:.2f}")
+    tela_saque.destroy()
 
 # Função para abrir a tela principal após o login.
 def abrir_tela_principal():
@@ -344,6 +458,8 @@ def abrir_tela_principal():
 
     tk.Button(frame_central, text="Ver Saldo", command=saldoC, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
     tk.Button(frame_central, text="Ver Extrato", command=extratoC, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
+    # Na função abrir_tela_principal(), adicione este botão junto com os outros
+    tk.Button(frame_central, text="Realizar Saque", command=abrir_tela_saque, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
     tk.Button(frame_central, text="Transferir", command=abrir_tela_transferencia, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
     tk.Button(frame_central, text="Simular Investimento", command=abrir_tela_investimento, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
     tk.Button(frame_central, text="Trocar Tipo de Conta", command=abrir_tela_troca_tipo, font=("Arial", 12), bg="lightblue", fg="black").pack(pady=5)
@@ -370,6 +486,8 @@ def abrir_tela_transferencia():
 
     tk.Label(frame_central, text="CPF do Destinatário:", font=("Arial", 12)).grid(row=0, column=0, pady=5)
     entry_cpf_destino = tk.Entry(frame_central, font=("Arial", 12))
+    entry_cpf_destino.insert(0, "xxx.xxx.xxx-xx")
+    entry_cpf_destino.bind("<FocusIn>", lambda event: entry_cpf_destino.delete(0, tk.END) if entry_cpf_destino.get() == "xxx.xxx.xxx-xx" else None)
     entry_cpf_destino.grid(row=0, column=1, pady=5)
 
     tk.Label(frame_central, text="Valor:", font=("Arial", 12)).grid(row=1, column=0, pady=5)
@@ -404,8 +522,10 @@ def abrir_tela_investimento():
     entry_valor_investimento = tk.Entry(frame_central, font=("Arial", 12))
     entry_valor_investimento.grid(row=0, column=1, pady=5)
 
-    tk.Label(frame_central, text="Data Final (mm/aaaa):", font=("Arial", 12)).grid(row=1, column=0, pady=5)
+    tk.Label(frame_central, text="Data Final:", font=("Arial", 12)).grid(row=1, column=0, pady=5)
     entry_data_final = tk.Entry(frame_central, font=("Arial", 12))
+    entry_data_final.insert(0, "mm/aaaa")
+    entry_data_final.bind("<FocusIn>", lambda event: entry_data_final.delete(0, tk.END) if entry_data_final.get() == "mm/aaaa" else None)
     entry_data_final.grid(row=1, column=1, pady=5)
 
     tk.Button(frame_central, text="Simular", command=simularInvestimento, font=("Arial", 12), bg="lightblue", fg="black").grid(row=2, column=0, columnspan=2, pady=10)
@@ -440,6 +560,8 @@ def abrir_tela_inicial():
     tela_inicial = tk.Tk()
     tela_inicial.title("Banco RNA")
     tela_inicial.geometry("500x400")
+    
+    tela_inicial.protocol("WM_DELETE_WINDOW", lambda: sys.exit())
 
     largura = 500
     altura = 400
@@ -459,7 +581,7 @@ def abrir_tela_inicial():
     tk.Button(tela_inicial, text="Deletar Minha Conta", command=abrir_tela_deletar_conta, font=("Arial", 12, "bold"), bg="red", fg="black", width=17, height=2).pack(pady=10)
     tk.Button(tela_inicial, text="Logar", command=abrir_tela_login, font=("Arial", 12, "bold"), bg="lightgreen", fg="black", width=17, height=2).pack(pady=10)
 
-    tela_inicial.mainloop()
+    # tela_inicial.mainloop()
 
 # Função para abrir a tela de deletar conta.
 def abrir_tela_deletar_conta():
@@ -481,6 +603,8 @@ def abrir_tela_deletar_conta():
 
     tk.Label(frame_central, text="CPF:", font=("Arial", 12)).grid(row=0, column=0, pady=5)
     entry_cpf_deletar = tk.Entry(frame_central, font=("Arial", 12))
+    entry_cpf_deletar.insert(0, "xxx.xxx.xxx-xx")
+    entry_cpf_deletar.bind("<FocusIn>", lambda event: entry_cpf_deletar.delete(0, tk.END) if entry_cpf_deletar.get() == "xxx.xxx.xxx-xx" else None)
     entry_cpf_deletar.grid(row=0, column=1, pady=5)
 
     tk.Label(frame_central, text="Senha:", font=("Arial", 12)).grid(row=1, column=0, pady=5)
@@ -507,4 +631,6 @@ def deletar_conta():
     tela_deletar_conta.destroy()
 
 # Iniciar a aplicação.
-abrir_tela_inicial()
+if __name__ == "__main__":
+    abrir_tela_inicial()
+    tela_inicial.mainloop()
